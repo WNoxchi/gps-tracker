@@ -1,0 +1,33 @@
+# custom
+.ignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+.venv/
+venv/
+env/
+.python-version
+pip-log.txt
+
+# C
+*.o
+*.so
+*.a
+*.dylib
+*.out
+*.exe
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
