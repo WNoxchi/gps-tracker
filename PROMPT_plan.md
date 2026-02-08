@@ -8,3 +8,5 @@
 IMPORTANT: Plan only. Do NOT implement anything. Do NOT assume functionality is missing; confirm with code search first. Treat `src/lib` as the project's standard library for shared utilities and components. Prefer consolidated, idiomatic implementations there over ad-hoc copies.
 
 ULTIMATE GOAL: We want to achieve [project-specific goal]. Consider missing elements and plan accordingly. If an element is missing, search first to confirm it doesn't exist, then if needed author the specification at specs/FILENAME.md. If you create a new element then document the plan to implement it in @IMPLEMENTATION_PLAN.md using a subagent.
+
+9. IF YOU FIND THE IMPLEMENTATION PLAN TO BE COMPLETE, HALT AND EMIT THE COMPLETION PROMISE. DO NOT BUILD ANY CODE OR I WILL BE MADE AT YOU.

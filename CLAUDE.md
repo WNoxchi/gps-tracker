@@ -32,6 +32,7 @@ Run these after implementing to get immediate feedback:
 - `HOST_BUILD=1` defined on host builds
 - Test framework: Unity (ThrowTheSwitch) in `external/Unity/`
 - Specs are in `specs/` — read these for requirements
+- Troubleshooting loopback: if you need logs or more information you can spawn a tmux session in a new pane and scrape the pane (eg. for logs). Please close the pane and session when you're done with it.
 
 ### Codebase Patterns
 

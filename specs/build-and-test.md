@@ -14,7 +14,7 @@ Test framework: [Unity](https://github.com/ThrowTheSwitch/Unity) (ThrowTheSwitch
 
 ```
 gps-tracker/
-  AGENTS.md
+  CLAUDE.md
   IMPLEMENTATION_PLAN.md
   PROMPT_build.md
   PROMPT_plan.md
