@@ -53,7 +53,7 @@ These items are implemented and verified to match their specifications. No actio
 - [x] **Create `src/main.c`** — Pico entry point guarded with `#ifndef HOST_BUILD`. Init sequence: power_mgmt → UART (9600 baud) → storage → parser → filter. Main loop: check power → read NMEA (1100ms timeout) → parse → filter → write. Shutdown on power loss: storage shutdown → parser destroy → halt.
 - [x] **Create `tests/test_main.c`** — Unity test runner. 57 extern declarations (lines 4-68), `UNITY_BEGIN`/`UNITY_END` with 57 `RUN_TEST` calls (lines 71-140). No setUp/tearDown (runner only).
 
-## Priority 4 (Non-blocking): Pico Filesystem HAL (hal_pico.c)
+## Priority 4 (BLOCKING): Pico Filesystem HAL (hal_pico.c)
 
 This is documented as out-of-scope for the Ralph Loop but noted for completeness.
 

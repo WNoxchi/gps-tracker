@@ -4,9 +4,9 @@ Dual-target CMake build with a HAL abstraction enabling hardware-free testing vi
 
 ## Overview
 
-Two build targets from the same source tree:
-- **Host** (Mac/Linux): native `gcc`/`clang`, mocked hardware, runs all unit tests. This is the Ralph Loop development target.
-- **Pico** (RP2350): cross-compile with `arm-none-eabi-gcc` via Pico SDK, produces `.uf2` for flashing.
+Two build targets from the same source tree — **both must build successfully**:
+- **Host** (Mac/Linux): native `gcc`/`clang`, mocked hardware, runs all unit tests.
+- **Pico** (RP2350): cross-compile with `arm-none-eabi-gcc` via Pico SDK, produces `.uf2` for flashing. This is the deployment target — the software must run on real hardware.
 
 Test framework: [Unity](https://github.com/ThrowTheSwitch/Unity) (ThrowTheSwitch) — single C file.
 
@@ -115,12 +115,38 @@ ctest --output-on-failure
 
 Pico (cross-compile):
 ```bash
-export PICO_SDK_PATH=/path/to/pico-sdk
+# If PICO_SDK_PATH is not set, clone it:
+#   git clone https://github.com/raspberrypi/pico-sdk.git external/pico-sdk --branch master
+#   cd external/pico-sdk && git submodule update --init && cd ../..
+#   export PICO_SDK_PATH=$(pwd)/external/pico-sdk
+export PICO_SDK_PATH=${PICO_SDK_PATH:-$(pwd)/external/pico-sdk}
 mkdir -p build/pico && cd build/pico
 cmake ../.. -DBUILD_FOR_PICO=ON -DBUILD_TESTS=OFF
 cmake --build .
 # Output: gps_tracker.uf2
 ```
+
+### Pico SDK and Toolchain Setup
+
+The Pico SDK and ARM cross-compiler are **not** checked into this repository. If they are not already present on the build machine, the build agent must install them:
+
+1. **ARM cross-compiler**: Install `arm-none-eabi-gcc` (e.g., `brew install arm-none-eabi-gcc` on macOS, `apt install gcc-arm-none-eabi` on Debian/Ubuntu).
+2. **Pico SDK**: Clone into `external/pico-sdk` and initialize its submodules:
+   ```bash
+   git clone https://github.com/raspberrypi/pico-sdk.git external/pico-sdk --branch master
+   cd external/pico-sdk && git submodule update --init && cd ../..
+   ```
+3. **Set `PICO_SDK_PATH`**: `export PICO_SDK_PATH=$(pwd)/external/pico-sdk`
+4. The `external/pico-sdk` directory is gitignored — it is a build-time dependency, not vendored source.
+
+### FatFs SD Card Library Setup
+
+The `no-OS-FatFS-SD-SPI-RPi-Pico` library is required for the Pico filesystem HAL. It must also be cloned if not present:
+```bash
+git clone https://github.com/carlk3/no-OS-FatFS-SD-SPI-RPi-Pico.git external/no-OS-FatFS-SD-SPI-RPi-Pico
+```
+
+The `hal_pico.c` filesystem functions must use this library — **stubs returning -1 are not acceptable**. Without a working filesystem HAL, the GPS tracker cannot save data on real hardware and the Pico build is non-functional.
 
 ## Compiler Flags
 
@@ -270,8 +296,8 @@ int main(void) {
 
 | Dependency | Purpose | Integration |
 |---|---|---|
-| [Pico SDK](https://github.com/raspberrypi/pico-sdk) | RP2350 HAL | `pico_sdk_import.cmake` (Pico only) |
-| [no-OS-FatFS-SD-SPI-RPi-Pico](https://github.com/carlk3/no-OS-FatFS-SD-SPI-RPi-Pico) | FAT32 on SD via SPI | Git submodule (Pico only) |
+| [Pico SDK](https://github.com/raspberrypi/pico-sdk) | RP2350 HAL | Clone to `external/pico-sdk`, set `PICO_SDK_PATH` (Pico only). Not checked in — download at build time if missing. |
+| [no-OS-FatFS-SD-SPI-RPi-Pico](https://github.com/carlk3/no-OS-FatFS-SD-SPI-RPi-Pico) | FAT32 on SD via SPI | Clone to `external/no-OS-FatFS-SD-SPI-RPi-Pico` (Pico only). Not checked in — download at build time if missing. |
 | [Unity](https://github.com/ThrowTheSwitch/Unity) | Unit tests | Vendored in `external/Unity/` (host only) |
 
 ## Codebase Conventions
@@ -288,8 +314,9 @@ int main(void) {
 |----|------|-------|------|
 | T1 | host_build_succeeds | Clean checkout, host cmake + make | Zero errors, zero warnings |
 | T2 | host_tests_pass | Host build complete | `ctest` exits 0, all tests pass |
-| T3 | pico_build_succeeds | Pico SDK installed | `gps_tracker.uf2` exists, > 0 bytes |
+| T3 | pico_build_succeeds | Pico SDK and ARM toolchain available | `gps_tracker.uf2` exists, > 0 bytes. All HAL functions in `hal_pico.c` have real implementations (no stubs returning -1). |
 | T4 | no_pico_sdk_in_host | Host build | No Pico SDK headers referenced. `HOST_BUILD=1` defined. |
 | T5 | mock_compiles_host_only | Host build | `hal_mock.c` compiled, `hal_pico.c` NOT |
 | T6 | pico_compiles_pico_only | Pico build | `hal_pico.c` compiled, `hal_mock.c` NOT |
 | T7 | werror_on_host | Unused variable in source | Host build fails |
+| T8 | pico_hal_no_stubs | Pico build | `hal_pico.c` contains no filesystem function stubs. All `hal_fs_*` functions call through to FatFs. |
