@@ -2,7 +2,7 @@
 
 # Implementation Plan
 
-Status: **✅ All modules implemented and tested** — Host build fixed, all 57 tests pass green.
+Status: **⚠️ INCOMPLETE** — All host modules implemented and tested (57 tests pass), but Pico filesystem HAL (Priority 4) is stubbed. Per specs/build-and-test.md (line 149), stubs are unacceptable and GPS tracker cannot function on real hardware without FatFs integration.
 
 ## Priority 1 (BLOCKING): ✅ COMPLETE - Fixed Host Build Failures
 
@@ -55,9 +55,37 @@ These items are implemented and verified to match their specifications. No actio
 
 ## Priority 4 (BLOCKING): Pico Filesystem HAL (hal_pico.c)
 
-This is documented as out-of-scope for the Ralph Loop but noted for completeness.
+**STATUS: INCOMPLETE** — **Acceptance tests T3 and T8 are currently FAILING** because filesystem functions are stubs. Mandatory requirements:
 
-- [ ] **Implement FatFs integration in `src/hal/hal_pico.c`** — All 11 filesystem functions (mount, unmount, open, write, read, sync, close, remove, exists, seek_end, read_byte_at_end, size) are stubs returning -1/NULL/false. Requires integrating `no-OS-FatFS-SD-SPI-RPi-Pico` library, configuring SPI0 on GP16(MISO)/GP17(CS)/GP18(CLK)/GP19(MOSI), and mapping HAL calls to FatFs `f_mount`, `f_open`, `f_write`, `f_read`, `f_sync`, `f_close`, `f_unlink`, `f_stat`, `f_lseek`, `f_size`. Without this, the GPS tracker cannot save data on actual hardware.
+- specs/build-and-test.md (line 149): "stubs returning -1 are not acceptable"
+- Acceptance Test T3 (pico_build_succeeds): "All HAL functions in `hal_pico.c` have real implementations (no stubs returning -1)"
+- Acceptance Test T8 (pico_hal_no_stubs): "`hal_pico.c` contains no filesystem function stubs. All `hal_fs_*` functions call through to FatFs."
+
+**Current state:** All 11 filesystem functions return stubs (-1/NULL/false), failing both T3 and T8.
+
+**Required implementation:**
+- [ ] Clone `no-OS-FatFS-SD-SPI-RPi-Pico` library to `external/no-OS-FatFS-SD-SPI-RPi-Pico`
+- [ ] Configure CMakeLists.txt to include and link FatFs library for Pico builds
+- [ ] Implement SPI0 initialization (GP16=MISO, GP17=CS, GP18=CLK, GP19=MOSI) in `hal_pico.c`
+- [ ] Replace all 11 filesystem stub functions with real FatFs implementations:
+  - `hal_fs_mount()` → `f_mount()`
+  - `hal_fs_unmount()` → `f_unmount()`
+  - `hal_fs_open()` → `f_open()`
+  - `hal_fs_write()` → `f_write()`
+  - `hal_fs_read()` → `f_read()`
+  - `hal_fs_sync()` → `f_sync()`
+  - `hal_fs_close()` → `f_close()`
+  - `hal_fs_remove()` → `f_unlink()`
+  - `hal_fs_exists()` → `f_stat()`
+  - `hal_fs_seek_end()` → `f_lseek()`
+  - `hal_fs_read_byte_at_end()` → custom impl via `f_lseek()` + `f_read()`
+  - `hal_fs_size()` → custom impl via `f_stat()`
+- [ ] Handle FatFs error codes (`FR_*`) and map to HAL return values
+- [ ] Pass Pico build test (T3): verify `.uf2` generated and no stubs
+- [ ] Pass filesystem stub test (T8): verify all functions call through to FatFs
+- [ ] Validate on real hardware with microSD card
+
+Without this, GPS tracker is non-functional on real hardware.
 
 ## Notes
 
