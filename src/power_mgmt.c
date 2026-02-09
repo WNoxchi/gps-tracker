@@ -1,5 +1,8 @@
 #include "power_mgmt.h"
 #include "hal/hal.h"
+#ifndef HOST_BUILD
+#include "hardware/gpio.h"
+#endif
 
 static volatile bool g_power_lost = false;
 

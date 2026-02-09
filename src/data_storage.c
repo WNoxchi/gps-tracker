@@ -98,7 +98,7 @@ storage_error_t data_storage_init(data_storage_t* storage) {
     storage->is_open = true;
 
     if (need_header) {
-        if (hal_fs_write(storage->file, CSV_HEADER, strlen(CSV_HEADER)) != 0) {
+        if (hal_fs_write(storage->file, CSV_HEADER, strlen(CSV_HEADER)) < 0) {
             return STORAGE_ERR_WRITE;
         }
     }
@@ -173,7 +173,7 @@ storage_error_t data_storage_write_fix(data_storage_t* storage, const gps_fix_t*
     line[pos++] = '\n';
     line[pos] = '\0';
 
-    if (hal_fs_write(storage->file, line, (size_t)pos) != 0) {
+    if (hal_fs_write(storage->file, line, (size_t)pos) < 0) {
         return STORAGE_ERR_WRITE;
     }
 
