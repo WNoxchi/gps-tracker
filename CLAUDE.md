@@ -24,7 +24,7 @@ Run these after implementing to get immediate feedback:
 - Tests: `cd build/host && ctest --output-on-failure`
 - Lint: `cppcheck --enable=all --error-exitcode=1 src/`
 - Build: `cmake --build build/host` (uses `-Wall -Wextra -Werror`)
-- Pico: The Pico build must also succeed. If the Pico SDK or ARM toolchain is not installed, set them up first. See `specs/build-and-test.md`.
+- Pico: The Pico build MUST succeed. Code that doesn't compile for the Pico target is not complete. If the SDK or toolchain is missing, install them first. Host-only test passes do NOT count as validation.
 
 ## Operational Notes
 
