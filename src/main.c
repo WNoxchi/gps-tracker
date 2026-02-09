@@ -9,13 +9,15 @@
 #include "pico/stdlib.h"
 
 #define GPS_BAUD_RATE 9600
-#define HW_TEST_DURATION_MS 300000
+
+#ifdef HW_VALIDATION_TEST
+#define HW_TEST_WRITE_WINDOW_MS 30000
+#endif
 
 int main(void) {
     stdio_init_all();
 
 #ifdef HW_VALIDATION_TEST
-    /* Wait for USB serial connection */
     while (!stdio_usb_connected()) {
         hal_sleep_ms(100);
     }
@@ -30,33 +32,27 @@ int main(void) {
 
     /* 3. Initialize storage */
     data_storage_t storage;
-    bool storage_ok = false;
-    storage_error_t serr = data_storage_init(&storage);
-#ifdef HW_VALIDATION_TEST
-    if (serr != STORAGE_OK) {
-        printf("WARN: storage init failed (code %d) — continuing without SD\n", serr);
-        printf("  1=MOUNT 2=OPEN 3=WRITE 4=SYNC 5=FULL 6=TOO_MANY\n");
-    } else {
-        printf("Storage OK, file: %s\n", data_storage_get_filename(&storage));
-        storage_ok = true;
-    }
-#else
-    if (serr != STORAGE_OK) {
+    if (data_storage_init(&storage) != STORAGE_OK) {
+        printf("ERROR: storage init failed\n");
         while (1) { /* halt */ }
     }
-    storage_ok = true;
-#endif
+    printf("Storage OK, file: %s\n", data_storage_get_filename(&storage));
 
     /* 4. Initialize NMEA parser */
     nmea_parser_t* parser = nmea_parser_create();
+    if (!parser) {
+        data_storage_shutdown(&storage);
+        while (1) { /* halt */ }
+    }
 
     /* 5. Initialize GPS filter (COLD_START) */
     gps_filter_t filter;
     gps_filter_init(&filter);
 
 #ifdef HW_VALIDATION_TEST
-    uint32_t start_ms = hal_time_ms();
-    uint32_t nmea_count = 0;
+    uint32_t fix_count = 0;
+    bool got_first_fix = false;
+    uint32_t write_window_start = 0;
 #endif
 
     /* 6. Main loop */
@@ -64,51 +60,61 @@ int main(void) {
 
     while (1) {
 #ifdef HW_VALIDATION_TEST
-        if (hal_time_ms() - start_ms > HW_TEST_DURATION_MS) {
-            printf("\n--- 30s window complete ---\n");
-            printf("NMEA sentences received: %lu\n", (unsigned long)nmea_count);
-            if (storage_ok) {
-                data_storage_shutdown(&storage);
-                printf("Storage shutdown OK\n");
-            }
-            if (parser) nmea_parser_destroy(parser);
+        /* After first fix, run 30s write window then clean shutdown */
+        if (got_first_fix && (hal_time_ms() - write_window_start > HW_TEST_WRITE_WINDOW_MS)) {
+            printf("\n--- 30s write window complete ---\n");
+            printf("Fixes written: %lu\n", (unsigned long)fix_count);
+            data_storage_shutdown(&storage);
+            nmea_parser_destroy(parser);
+            printf("Storage shutdown OK — safe to unplug\n");
             while (1) { /* halt */ }
         }
 #endif
 
+        /* Check power — FIRST thing each iteration */
         if (power_mgmt_is_shutdown_requested()) {
-            if (storage_ok) data_storage_shutdown(&storage);
-            if (parser) nmea_parser_destroy(parser);
-            while (1) { /* halt */ }
+            data_storage_shutdown(&storage);
+            nmea_parser_destroy(parser);
+            while (1) { /* halt, wait for power to die */ }
         }
 
+        /* Read NMEA line from UART */
         int len = hal_uart_read_line(line_buf, sizeof(line_buf), 1100);
         if (len <= 0) continue;
 
-#ifdef HW_VALIDATION_TEST
-        nmea_count++;
-        printf("NMEA: %s\n", line_buf);
-#endif
-
-        if (!parser) continue;
+        /* Parse */
         nmea_result_t result = nmea_parser_feed(parser, line_buf);
         if (result != NMEA_RESULT_FIX_READY) continue;
 
+        /* Get completed fix */
         gps_fix_t fix;
         if (!nmea_parser_get_fix(parser, &fix)) continue;
 
+        /* Validity gate */
         if (!(fix.flags & GPS_FIX_VALID) || !(fix.flags & GPS_HAS_LATLON)) continue;
 
-#ifndef HW_VALIDATION_TEST
+#ifdef HW_VALIDATION_TEST
+        /* Skip filter in validation mode (stationary device) */
+        if (!got_first_fix) {
+            got_first_fix = true;
+            write_window_start = hal_time_ms();
+            printf("*** FIRST FIX! lat=%.6f lon=%.6f sats=%d ***\n",
+                   fix.latitude, fix.longitude, fix.satellites);
+            printf("Starting 30s write window...\n");
+        }
+#else
+        /* Filter: reject stationary and outlier fixes */
         if (gps_filter_process(&filter, &fix) != FILTER_ACCEPT) continue;
 #endif
 
-        if (storage_ok) {
-            data_storage_write_fix(&storage, &fix);
+        /* Store */
+        data_storage_write_fix(&storage, &fix);
+
 #ifdef HW_VALIDATION_TEST
-            printf("FIX WRITTEN: %.6f,%.6f\n", fix.latitude, fix.longitude);
+        fix_count++;
+        printf("FIX #%lu: %.6f,%.6f sats=%d\n",
+               (unsigned long)fix_count, fix.latitude, fix.longitude, fix.satellites);
 #endif
-        }
     }
 }
 

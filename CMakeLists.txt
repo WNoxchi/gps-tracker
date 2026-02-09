@@ -60,10 +60,7 @@ if(BUILD_FOR_PICO)
     add_executable(gps_tracker src/main.c)
     target_link_libraries(gps_tracker gps_tracker_lib)
 
-    if(HW_VALIDATION_TEST)
-        pico_enable_stdio_usb(gps_tracker 1)
-    endif()
-
+    pico_enable_stdio_usb(gps_tracker 1)
     pico_add_extra_outputs(gps_tracker)
 else()
     target_sources(gps_tracker_lib PRIVATE src/hal/hal_mock.c)
