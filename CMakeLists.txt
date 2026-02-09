@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 option(BUILD_FOR_PICO "Build for Raspberry Pi Pico 2" OFF)
 option(BUILD_TESTS "Build unit tests (host only)" ON)
+option(HW_VALIDATION_TEST "Hardware validation test mode" OFF)
 
 if(BUILD_FOR_PICO)
     set(PICO_BOARD pico2)
@@ -51,8 +52,15 @@ if(BUILD_FOR_PICO)
     )
 
     target_link_libraries(gps_tracker_lib pico_stdlib hardware_uart hardware_spi hardware_gpio hardware_dma)
+
+    if(HW_VALIDATION_TEST)
+        target_compile_definitions(gps_tracker_lib PUBLIC HW_VALIDATION_TEST=1)
+    endif()
+
     add_executable(gps_tracker src/main.c)
     target_link_libraries(gps_tracker gps_tracker_lib)
+
+    pico_enable_stdio_usb(gps_tracker 1)
     pico_add_extra_outputs(gps_tracker)
 else()
     target_sources(gps_tracker_lib PRIVATE src/hal/hal_mock.c)

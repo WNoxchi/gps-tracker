@@ -29,6 +29,8 @@ int hal_uart_read_line(char* buf, size_t buf_size, uint32_t timeout_ms) {
         }
         char c = uart_getc(GPS_UART);
         if (c == '\n') {
+            /* Strip trailing \r from NMEA \r\n line ending */
+            if (i > 0 && buf[i - 1] == '\r') i--;
             buf[i] = '\0';
             return (int)i;
         }
