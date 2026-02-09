@@ -5,8 +5,10 @@
 #include "data_storage.h"
 #include "power_mgmt.h"
 #include "hal/hal.h"
+#include <stdio.h>
 
 #define GPS_BAUD_RATE 9600
+#define HW_TEST_DURATION_MS 30000
 
 int main(void) {
     /* 1. Initialize power management */
@@ -32,10 +34,24 @@ int main(void) {
     gps_filter_t filter;
     gps_filter_init(&filter);
 
+#ifdef HW_VALIDATION_TEST
+    /* Capture start time for 30-second validation window */
+    uint32_t start_ms = hal_time_ms();
+#endif
+
     /* 6. Main loop */
     char line_buf[NMEA_MAX_SENTENCE_LEN + 1];
 
     while (1) {
+#ifdef HW_VALIDATION_TEST
+        /* Check for 30-second window timeout */
+        if (hal_time_ms() - start_ms > HW_TEST_DURATION_MS) {
+            data_storage_shutdown(&storage);
+            nmea_parser_destroy(parser);
+            while (1) { /* halt, validation complete */ }
+        }
+#endif
+
         /* Check power — FIRST thing each iteration */
         if (power_mgmt_is_shutdown_requested()) {
             data_storage_shutdown(&storage);
@@ -55,11 +71,24 @@ int main(void) {
         gps_fix_t fix;
         if (!nmea_parser_get_fix(parser, &fix)) continue;
 
-        /* Filter */
+        /* Validity gate: check GPS_FIX_VALID and GPS_HAS_LATLON */
+        if (!(fix.flags & GPS_FIX_VALID) || !(fix.flags & GPS_HAS_LATLON)) continue;
+
+#ifndef HW_VALIDATION_TEST
+        /* Filter (skip in validation mode, but validity gate already checked) */
         if (gps_filter_process(&filter, &fix) != FILTER_ACCEPT) continue;
+#endif
 
         /* Store */
         data_storage_write_fix(&storage, &fix);
+
+#ifdef HW_VALIDATION_TEST
+        /* USB serial echo for real-time monitoring */
+        printf("%f,%f,%f,%f,%f,%d,%d,%d,%d\n",
+               fix.latitude, fix.longitude, fix.altitude,
+               fix.speed_kmh, fix.course_degrees,
+               fix.hdop_cm, fix.satellites, fix.utc_hour, fix.utc_minute);
+#endif
     }
 }
 
