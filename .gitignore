@@ -1,6 +1,11 @@
 # custom
 .ignore
 
+# Build-time external dependencies (Unity is vendored, keep tracked)
+external/pico-sdk/
+external/arm-toolchain/
+external/no-OS-FatFS-SD-SPI-RPi-Pico/
+
 # Python
 __pycache__/
 *.py[cod]
