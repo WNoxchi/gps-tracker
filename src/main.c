@@ -84,10 +84,7 @@ int main(void) {
 
 #ifdef HW_VALIDATION_TEST
         /* USB serial echo for real-time monitoring */
-        printf("%f,%f,%f,%f,%f,%d,%d,%d,%d\n",
-               fix.latitude, fix.longitude, fix.altitude,
-               fix.speed_kmh, fix.course_degrees,
-               fix.hdop_cm, fix.satellites, fix.utc_hour, fix.utc_minute);
+        printf("FIX: %.6f,%.6f\n", fix.latitude, fix.longitude);
 #endif
     }
 }
